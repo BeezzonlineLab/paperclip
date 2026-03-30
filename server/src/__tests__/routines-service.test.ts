@@ -55,6 +55,7 @@ describeEmbeddedPostgres("routine service live-execution coalescing", () => {
   });
 
   afterAll(async () => {
+    await db.$client.end();
     await tempDb?.cleanup();
   });
 
