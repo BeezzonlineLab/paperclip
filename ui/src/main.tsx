@@ -3,8 +3,10 @@ import { StrictMode } from "react";
 import * as ReactDOM from "react-dom";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "@/lib/router";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
 import { App } from "./App";
+import { ApiError } from "./api/client";
+import { queryKeys } from "./lib/queryKeys";
 import { CompanyProvider } from "./context/CompanyContext";
 import { LiveUpdatesProvider } from "./context/LiveUpdatesProvider";
 import { BreadcrumbProvider } from "./context/BreadcrumbContext";
@@ -28,6 +30,22 @@ if ("serviceWorker" in navigator) {
 }
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error) => {
+      // Handle 401 errors globally by invalidating the session
+      if (error instanceof ApiError && error.status === 401) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.auth.session });
+      }
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (error) => {
+      // Handle 401 errors globally by invalidating the session
+      if (error instanceof ApiError && error.status === 401) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.auth.session });
+      }
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,

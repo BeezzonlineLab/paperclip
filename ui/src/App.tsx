@@ -1,5 +1,6 @@
 import { Navigate, Outlet, Route, Routes, useLocation, useParams } from "@/lib/router";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Layout } from "./components/Layout";
 import { OnboardingWizard } from "./components/OnboardingWizard";
@@ -45,6 +46,7 @@ import { NotFoundPage } from "./pages/NotFound";
 import { queryKeys } from "./lib/queryKeys";
 import { useCompany } from "./context/CompanyContext";
 import { useDialog } from "./context/DialogContext";
+import { useToast } from "./context/ToastContext";
 import { loadLastInboxTab } from "./lib/inbox";
 import { shouldRedirectCompanylessRouteToOnboarding } from "./lib/onboarding-route";
 
@@ -68,6 +70,9 @@ function BootstrapPendingPage({ hasActiveInvite = false }: { hasActiveInvite?: b
 
 function CloudAccessGate() {
   const location = useLocation();
+  const { pushToast } = useToast();
+  const hasShownSessionExpiredToast = useRef(false);
+
   const healthQuery = useQuery({
     queryKey: queryKeys.health,
     queryFn: () => healthApi.get(),
@@ -89,7 +94,33 @@ function CloudAccessGate() {
     queryFn: () => authApi.getSession(),
     enabled: isAuthenticatedMode,
     retry: false,
+    // Revalidate session when user returns to tab after inactivity
+    refetchOnWindowFocus: true,
+    // Consider session data stale after 5 minutes
+    staleTime: 5 * 60 * 1000,
+    // Refetch every 10 minutes to keep session alive
+    refetchInterval: 10 * 60 * 1000,
   });
+
+  // Show toast notification when session expires and we're about to redirect
+  useEffect(() => {
+    if (
+      isAuthenticatedMode &&
+      !sessionQuery.isLoading &&
+      !sessionQuery.data &&
+      sessionQuery.isFetched &&
+      !hasShownSessionExpiredToast.current &&
+      location.pathname !== "/auth"
+    ) {
+      hasShownSessionExpiredToast.current = true;
+      pushToast({
+        title: "Session expired",
+        body: "Your session has expired. Please sign in again.",
+        tone: "warn",
+        ttlMs: 5000,
+      });
+    }
+  }, [isAuthenticatedMode, sessionQuery.isLoading, sessionQuery.data, sessionQuery.isFetched, location.pathname, pushToast]);
 
   if (healthQuery.isLoading || (isAuthenticatedMode && sessionQuery.isLoading)) {
     return <div className="mx-auto max-w-xl py-10 text-sm text-muted-foreground">Loading...</div>;
