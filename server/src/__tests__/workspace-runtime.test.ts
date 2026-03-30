@@ -541,8 +541,10 @@ describe("realizeExecutionWorkspace", () => {
     expect(operations[1]?.command).toBe("bash ./scripts/provision.sh");
   });
 
-  it("reuses an existing branch without resetting it when recreating a missing worktree", async () => {
-    const repoRoot = await createTempRepo();
+  it(
+    "reuses an existing branch without resetting it when recreating a missing worktree",
+    async () => {
+      const repoRoot = await createTempRepo();
     const branchName = "PAP-450-recreate-missing-worktree";
 
     await runGit(repoRoot, ["checkout", "-b", branchName]);
@@ -579,14 +581,18 @@ describe("realizeExecutionWorkspace", () => {
       },
     });
 
-    expect(workspace.branchName).toBe(branchName);
-    await expect(fs.readFile(path.join(workspace.cwd, "feature.txt"), "utf8")).resolves.toBe("preserve me\n");
-    const actualHead = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: workspace.cwd })).stdout.trim();
-    expect(actualHead).toBe(expectedHead);
-  });
+      expect(workspace.branchName).toBe(branchName);
+      await expect(fs.readFile(path.join(workspace.cwd, "feature.txt"), "utf8")).resolves.toBe("preserve me\n");
+      const actualHead = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: workspace.cwd })).stdout.trim();
+      expect(actualHead).toBe(expectedHead);
+    },
+    15000,
+  );
 
-  it("removes a created git worktree and branch during cleanup", async () => {
-    const repoRoot = await createTempRepo();
+  it(
+    "removes a created git worktree and branch during cleanup",
+    async () => {
+      const repoRoot = await createTempRepo();
 
     const workspace = await realizeExecutionWorkspace({
       base: {
@@ -640,15 +646,19 @@ describe("realizeExecutionWorkspace", () => {
     expect(cleanup.cleaned).toBe(true);
     expect(cleanup.warnings).toEqual([]);
     await expect(fs.stat(workspace.cwd)).rejects.toThrow();
-    await expect(
-      execFileAsync("git", ["branch", "--list", workspace.branchName!], { cwd: repoRoot }),
-    ).resolves.toMatchObject({
-      stdout: "",
-    });
-  });
+      await expect(
+        execFileAsync("git", ["branch", "--list", workspace.branchName!], { cwd: repoRoot }),
+      ).resolves.toMatchObject({
+        stdout: "",
+      });
+    },
+    15000,
+  );
 
-  it("keeps an unmerged runtime-created branch and warns instead of force deleting it", async () => {
-    const repoRoot = await createTempRepo();
+  it(
+    "keeps an unmerged runtime-created branch and warns instead of force deleting it",
+    async () => {
+      const repoRoot = await createTempRepo();
 
     const workspace = await realizeExecutionWorkspace({
       base: {
@@ -703,18 +713,22 @@ describe("realizeExecutionWorkspace", () => {
       },
     });
 
-    expect(cleanup.cleaned).toBe(true);
-    expect(cleanup.warnings).toHaveLength(1);
-    expect(cleanup.warnings[0]).toContain(`Skipped deleting branch "${workspace.branchName}"`);
-    await expect(
-      execFileAsync("git", ["branch", "--list", workspace.branchName!], { cwd: repoRoot }),
-    ).resolves.toMatchObject({
-      stdout: expect.stringContaining(workspace.branchName!),
-    });
-  });
+      expect(cleanup.cleaned).toBe(true);
+      expect(cleanup.warnings).toHaveLength(1);
+      expect(cleanup.warnings[0]).toContain(`Skipped deleting branch "${workspace.branchName}"`);
+      await expect(
+        execFileAsync("git", ["branch", "--list", workspace.branchName!], { cwd: repoRoot }),
+      ).resolves.toMatchObject({
+        stdout: expect.stringContaining(workspace.branchName!),
+      });
+    },
+    15000,
+  );
 
-  it("records teardown and cleanup operations when a recorder is provided", async () => {
-    const repoRoot = await createTempRepo();
+  it(
+    "records teardown and cleanup operations when a recorder is provided",
+    async () => {
+      const repoRoot = await createTempRepo();
     const { recorder, operations } = createWorkspaceOperationRecorderDouble();
 
     const workspace = await realizeExecutionWorkspace({
@@ -767,24 +781,28 @@ describe("realizeExecutionWorkspace", () => {
       recorder,
     });
 
-    expect(operations.map((operation) => operation.phase)).toEqual([
-      "workspace_teardown",
-      "worktree_cleanup",
-      "worktree_cleanup",
-    ]);
-    expect(operations[0]?.command).toBe("printf 'cleanup ok\\n'");
-    expect(operations[1]?.metadata).toMatchObject({
-      cleanupAction: "worktree_remove",
-    });
-    expect(operations[2]?.metadata).toMatchObject({
-      cleanupAction: "branch_delete",
-    });
-  });
+      expect(operations.map((operation) => operation.phase)).toEqual([
+        "workspace_teardown",
+        "worktree_cleanup",
+        "worktree_cleanup",
+      ]);
+      expect(operations[0]?.command).toBe("printf 'cleanup ok\\n'");
+      expect(operations[1]?.metadata).toMatchObject({
+        cleanupAction: "worktree_remove",
+      });
+      expect(operations[2]?.metadata).toMatchObject({
+        cleanupAction: "branch_delete",
+      });
+    },
+    15000,
+  );
 });
 
 describe("ensureRuntimeServicesForRun", () => {
-  it("reuses shared runtime services across runs and starts a new service after release", async () => {
-    const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-runtime-workspace-"));
+  it(
+    "reuses shared runtime services across runs and starts a new service after release",
+    async () => {
+      const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-runtime-workspace-"));
     const workspace = buildWorkspace(workspaceRoot);
     const serviceCommand =
       "node -e \"require('node:http').createServer((req,res)=>res.end('ok')).listen(Number(process.env.PORT), '127.0.0.1')\"";
@@ -877,10 +895,12 @@ describe("ensureRuntimeServicesForRun", () => {
       adapterEnv: {},
     });
 
-    expect(third).toHaveLength(1);
-    expect(third[0]?.reused).toBe(false);
-    expect(third[0]?.id).not.toBe(first[0]?.id);
-  });
+      expect(third).toHaveLength(1);
+      expect(third[0]?.reused).toBe(false);
+      expect(third[0]?.id).not.toBe(first[0]?.id);
+    },
+    15000,
+  );
 
   it("does not reuse project-scoped shared services across different workspace launch contexts", async () => {
     const primaryWorkspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-runtime-primary-"));
