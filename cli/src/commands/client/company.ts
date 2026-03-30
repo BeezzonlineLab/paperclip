@@ -350,6 +350,7 @@ export function buildSelectedFilesFromImportSelection(
 
 export function buildDefaultImportAdapterOverrides(
   preview: Pick<CompanyPortabilityPreviewResult, "manifest" | "selectedAgentSlugs">,
+  selectedAdapterType?: string,
 ): Record<string, { adapterType: string }> | undefined {
   const selectedAgentSlugs = new Set(preview.selectedAgentSlugs);
   const overrides = Object.fromEntries(
@@ -359,8 +360,7 @@ export function buildDefaultImportAdapterOverrides(
       .map((agent) => [
         agent.slug,
         {
-          // TODO: replace this temporary claude_local fallback with adapter selection in the import TUI.
-          adapterType: "claude_local",
+          adapterType: selectedAdapterType || "claude_local",
         },
       ]),
   );
@@ -377,6 +377,57 @@ function buildDefaultImportAdapterMessages(
   return [
     `Using ${adapterTypes.join(", ")} adapter${adapterTypes.length === 1 ? "" : "s"} for ${agentCount} imported ${pluralize(agentCount, "agent")} without an explicit adapter.`,
   ];
+}
+
+async function promptForAdapterSelection(
+  preview: CompanyPortabilityPreviewResult,
+): Promise<string | undefined> {
+  const selectedAgentSlugs = new Set(preview.selectedAgentSlugs);
+  const processAdapters = preview.manifest.agents.filter(
+    (agent) =>
+      (selectedAgentSlugs.size === 0 || selectedAgentSlugs.has(agent.slug)) && agent.adapterType === "process",
+  );
+
+  if (processAdapters.length === 0) {
+    return undefined;
+  }
+
+  const agentCount = processAdapters.length;
+  const agentNoun = pluralize(agentCount, "agent");
+
+  const adapterType = await p.select<string>({
+    message: `Select adapter type for ${agentCount} imported ${agentNoun} with generic "process" adapter`,
+    options: [
+      {
+        value: "claude_local",
+        label: "Claude Code (claude-local)",
+        hint: "Local Claude Code adapter (recommended)",
+      },
+      {
+        value: "codex_local",
+        label: "Codex (codex-local)",
+        hint: "Local Codex adapter",
+      },
+      {
+        value: "cursor_local",
+        label: "Cursor (cursor-local)",
+        hint: "Local Cursor adapter",
+      },
+      {
+        value: "hermes_local",
+        label: "Hermes (hermes-local)",
+        hint: "Local Hermes adapter",
+      },
+    ],
+    initialValue: "claude_local",
+  });
+
+  if (p.isCancel(adapterType)) {
+    p.cancel("Import cancelled.");
+    process.exit(0);
+  }
+
+  return adapterType;
 }
 
 async function promptForImportSelection(preview: CompanyPortabilityPreviewResult): Promise<string[]> {
@@ -1265,7 +1316,9 @@ export function registerCompanyCommands(program: Command): void {
           if (!preview) {
             throw new Error("Import preview returned no data.");
           }
-          const adapterOverrides = buildDefaultImportAdapterOverrides(preview);
+
+          const selectedAdapterType = await promptForAdapterSelection(preview);
+          const adapterOverrides = buildDefaultImportAdapterOverrides(preview, selectedAdapterType);
           const adapterMessages = buildDefaultImportAdapterMessages(adapterOverrides);
 
           if (opts.dryRun) {
