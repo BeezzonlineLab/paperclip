@@ -49,6 +49,7 @@ describeEmbeddedPostgres("issueService.list participantAgentId", () => {
   });
 
   afterAll(async () => {
+    await db.$client.end();
     await tempDb?.cleanup();
   });
 

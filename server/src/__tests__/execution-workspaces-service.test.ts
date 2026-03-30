@@ -145,6 +145,7 @@ describeEmbeddedPostgres("executionWorkspaceService.getCloseReadiness", () => {
   });
 
   afterAll(async () => {
+    await db.$client.end();
     await tempDb?.cleanup();
   });
 

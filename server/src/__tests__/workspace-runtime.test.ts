@@ -1181,6 +1181,7 @@ describeEmbeddedPostgres("workspace runtime startup reconciliation", () => {
   }, 20_000);
 
   afterAll(async () => {
+    await db.$client.end();
     await tempDb?.cleanup();
   });
 

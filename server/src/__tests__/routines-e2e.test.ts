@@ -112,6 +112,7 @@ describeEmbeddedPostgres("routine routes end-to-end", () => {
   });
 
   afterAll(async () => {
+    await db.$client.end();
     await tempDb?.cleanup();
   });
 
