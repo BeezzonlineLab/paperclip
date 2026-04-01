@@ -212,8 +212,11 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     const runtimeSessionParams = parseObject(runtime.sessionParams);
     const runtimeSessionId = asString(runtimeSessionParams.sessionId, runtime.sessionId ?? "");
     const runtimeSessionCwd = asString(runtimeSessionParams.cwd, "");
+    // OpenCode requires session IDs to start with "ses" — reject legacy UUIDs from adapter switches
+    const isValidOpenCodeSessionId = runtimeSessionId.startsWith("ses");
     const canResumeSession =
       runtimeSessionId.length > 0 &&
+      isValidOpenCodeSessionId &&
       (runtimeSessionCwd.length === 0 || path.resolve(runtimeSessionCwd) === path.resolve(cwd));
     const sessionId = canResumeSession ? runtimeSessionId : null;
     if (runtimeSessionId && !canResumeSession) {
