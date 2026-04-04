@@ -14,12 +14,12 @@ export function DashboardWidget({ context }: PluginWidgetProps) {
     companyId: context.companyId,
   });
 
-  if (loading) return <div style={{ padding: 16 }}>Loading...</div>;
+  if (loading) return <div style={{ padding: 16, color: "var(--foreground, #1f2937)" }}>Loading...</div>;
   if (error) return <div style={{ padding: 16, color: "red" }}>Error: {error.message}</div>;
-  if (!data) return <div style={{ padding: 16 }}>Not configured</div>;
+  if (!data) return <div style={{ padding: 16, color: "var(--muted-foreground, #6b7280)" }}>Not configured</div>;
 
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ padding: 16, color: "var(--foreground, #1f2937)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <span
           style={{
@@ -41,7 +41,7 @@ export function DashboardWidget({ context }: PluginWidgetProps) {
         </div>
       )}
       {data.rateLimit && (
-        <div style={{ fontSize: 12, color: "#6b7280" }}>
+        <div style={{ fontSize: 12, color: "var(--muted-foreground, #6b7280)" }}>
           API: {data.rateLimit.remaining} calls remaining
         </div>
       )}
