@@ -9,6 +9,55 @@ description: >
 
 Use this skill when integrating Stripe for Business App billing.
 
+## Current Plan Structure (from code)
+
+| | Free | Starter | Growth | Enterprise |
+|---|---|---|---|---|
+| **Prix/mois** | $0 | $29 | $89 | Sur devis |
+| **Trial** | 0 | 14 jours | 14 jours | — |
+| **Infrastructure** | Serverless | Serverless | **Kubernetes** | Custom |
+| **Max apps** | 1 | 5 | 10 | Custom |
+| **Max membres** | 1 | 3 | 5 | Custom |
+| **Base de données** | ❌ | 1 shared PG | 1 dedicated PG | Custom |
+| **Custom domains** | 0 | 3 | 10 | Custom |
+| **Bandwidth** | 5 GB | 50 GB | 200 GB | Custom |
+| **Storage** | 1 GB | 5 GB | 20 GB | Custom |
+
+## Quota Enforcement Rules
+
+- **4 hard blockers (HTTP 402)**: `app_count`, `member_count`, `database_count`, `custom_domain_count`
+- Bandwidth + storage: tracked but NOT blocking currently
+- **Grace period**: 7 days after `invoice.payment_failed` — apps stay active, then full block
+- **Downgrade**: Stripe cancellation → auto-revert to Free plan
+- **Dénormalisé**: `Organization.effective_quota` = JSON copy of plan limits, updated by Stripe webhook
+
+## CRITICAL: Infrastructure Mismatch
+
+Business Apps (Odoo, Nextcloud, Akeneo, Nemoclaw) require `infrastructure: "kubernetes"`.
+Free and Starter plans have `infra_type: "serverless"`.
+
+**→ Business Apps can ONLY be deployed on Growth plan or higher.**
+**→ This enforcement is NOT yet implemented in `views_business_apps.py` — it must be added.**
+
+## Key Billing Files
+
+| File | Role |
+|------|------|
+| `payment/platform_models.py` | PlatformPlan + OrganizationPlatformSubscription |
+| `payment/quota_enforcer.py` | Blocking logic (HTTP 402) |
+| `payment/platform_stripe_service.py` | Checkout, portal, webhooks |
+| `payment/platform_billing_views.py` | API `/api/billing/v1/` |
+| `payment/management/commands/seed_platform_plans.py` | Plan seed data |
+| `authentication/models.py` | Organization.effective_quota, infra_type, grace |
+| `instant_apps/views_paas.py` | Quota enforcement on deployment creation |
+| `instant_apps/views_business_apps.py` | **Missing infra_type enforcement** |
+| `frontend/admin/src/pages/BillingPage.tsx` | UI plans + usage bars |
+| `frontend/admin/src/lib/billing-types.ts` | TypeScript types |
+
+## Legacy Warning
+
+`payment/models.py` contains old MCP models (`SubscriptionPlan`, `UserSubscription`) being deprecated. Use `platform_models.py` for all new billing work.
+
 ## Billing Model
 
 Each Business App instance = one Stripe Subscription.

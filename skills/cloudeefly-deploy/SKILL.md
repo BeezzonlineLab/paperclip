@@ -10,14 +10,24 @@ description: >
 
 Use this skill when you need to add a new app to the Business Apps catalog or create a deployment template.
 
+## CRITICAL: Infrastructure Rules
+
+**ALL Business Apps deploy on Kubernetes (bundled on the 6-node cluster). NOT on Scaleway serverless.**
+
+- `infrastructure` field MUST default to `"kubernetes"` — never `"serverless"` for Business Apps
+- Odoo, Akeneo, Nextcloud, OpenClaw, Hermes → **always Kubernetes**
+- MCP Servers → **Kubernetes** (via Argo Workflows + Kaniko build)
+- Scaleway serverless is ONLY for: static landing pages and lightweight proxies (< 512Mi)
+- If you see `infrastructure: "serverless"` for a Business App, it is WRONG — fix it
+
 ## Deployment Architecture
 
 ```
 User clicks "Deploy" in UI
-  → Django API creates deployment record
-  → Triggers Argo Workflow (Kaniko build if needed)
-  → ArgoCD Application created from template
-  → K8s resources deployed (Deployment, Service, Ingress)
+  → Django API creates deployment record (infrastructure: "kubernetes")
+  → Triggers Argo Workflow (Kaniko build if custom image needed)
+  → ArgoCD Application created from Helm chart template
+  → K8s resources deployed on cluster (Deployment, Service, Ingress)
   → Health check confirms app is running
   → Status updated in Django DB
 ```
@@ -128,9 +138,18 @@ Before marking a deployment template as ready:
 - [ ] ArgoCD Application template works
 - [ ] Tested in dev namespace
 
-## Scaling Rules
+## Infrastructure Routing
 
-- **Small apps** (< 512Mi RAM): Deploy on Scaleway Container Service
-- **Growing apps** (> 512Mi RAM): Deploy on K8s cluster
-- First-tier databases: shared PostgreSQL cluster
-- Second-tier databases: dedicated instance per tenant
+| App type | Infrastructure | Where |
+|----------|---------------|-------|
+| Business Apps (Odoo, Akeneo, Nextcloud, OpenClaw, Hermes) | `kubernetes` | K8s cluster (6 nodes) |
+| MCP Servers | `kubernetes` | K8s cluster via Argo Workflows |
+| Static sites, landing pages | `serverless` | Scaleway Container Service |
+| Lightweight proxies (< 512Mi) | `serverless` | Scaleway Container Service |
+
+**Default for ALL Business Apps: `infrastructure: "kubernetes"`**. No exceptions.
+
+## Database Tiers
+
+- **First tier** (starter plans): shared PostgreSQL cluster
+- **Second tier** (business/enterprise plans): dedicated PostgreSQL instance per tenant

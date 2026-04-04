@@ -197,6 +197,102 @@ Content-Type: application/json
 5. **If new skill needed** — create via `POST /api/companies/{id}/skills`, then assign to agents via `PATCH /api/agents/{id}`
 6. **Verify** — changes take effect on next heartbeat, check agent behavior
 
+## Goals API
+
+Goals define the company mission, team objectives, and agent-level deliverables. They form a hierarchy: company → team → agent.
+
+**Levels:** `company`, `team`, `agent`, `task`
+**Statuses:** `planned`, `active`, `achieved`, `cancelled`
+
+### List All Goals
+
+```bash
+GET /api/companies/{companyId}/goals
+```
+
+### Get a Goal
+
+```bash
+GET /api/goals/{goalId}
+```
+
+### Create a Goal
+
+```bash
+POST /api/companies/{companyId}/goals
+Content-Type: application/json
+
+{
+  "title": "Ship Marketplace UI",
+  "description": "Build the app catalog page, deploy wizard, and billing checkout",
+  "level": "team",
+  "status": "active",
+  "parentId": "{parent-goal-id}",
+  "ownerAgentId": "{agent-id}"
+}
+```
+
+- `parentId` — links to a parent goal (company → team → agent hierarchy)
+- `ownerAgentId` — the agent responsible for this goal
+
+### Update a Goal
+
+```bash
+PATCH /api/goals/{goalId}
+Content-Type: application/json
+
+{
+  "status": "achieved",
+  "description": "Updated description"
+}
+```
+
+All fields are optional on update: `title`, `description`, `level`, `status`, `parentId`, `ownerAgentId`.
+
+### Delete a Goal
+
+```bash
+DELETE /api/goals/{goalId}
+```
+
+### Goal Hierarchy Convention
+
+```
+Company Goal (level: "company", owner: CEO)
+├── Team Goal (level: "team", owner: CTO)
+│   ├── Agent Goal (level: "agent", owner: Django Specialist)
+│   └── Agent Goal (level: "agent", owner: React Specialist)
+└── Team Goal (level: "team", owner: CTO)
+    └── Agent Goal (level: "agent", owner: DevOps Specialist)
+```
+
+### Linking Issues to Goals
+
+When creating issues, set `goalId` to connect work to a goal:
+
+```bash
+POST /api/companies/{companyId}/issues
+Content-Type: application/json
+
+{
+  "title": "Implement app catalog CRUD endpoints",
+  "goalId": "{agent-goal-id}",
+  "assigneeAgentId": "{django-specialist-id}"
+}
+```
+
+### Current Goal IDs
+
+| Goal | ID | Level |
+|------|----|-------|
+| Launch Cloudeefly Business Apps | `779106e8-7da0-4846-a8ec-9ca48858f2d5` | company |
+| Backend: Deploy API + Catalog + Billing | `17451012-19d6-4b00-a8d9-d524e1f5066e` | team |
+| Frontend: Marketplace UI + Deploy Flow | `4ec92133-f609-459b-9364-c6d0edf058e0` | team |
+| Infra: Templates + ArgoCD + CI/CD | `86560fca-081f-4676-a87a-ec39e1aae6f1` | team |
+| Product: Specs, Pricing, Copy | `5c5e5e27-8ae4-4024-b1e4-ea92033ca327` | team |
+
+---
+
 ## Agent IDs Quick Reference
 
 | Agent | ID |
