@@ -366,15 +366,19 @@ function buildWakeText(payload: WakePayload, paperclipEnv: Record<string, string
   const issueIdHint = payload.taskId ?? payload.issueId ?? "";
   const apiBaseHint = paperclipEnv.PAPERCLIP_API_URL ?? "<set PAPERCLIP_API_URL>";
 
+  // Determine if the Paperclip API is reachable from the agent (remote agents can't reach localhost)
+  const apiUrl = paperclipEnv.PAPERCLIP_API_URL ?? "";
+  const isLocalApi = apiUrl.includes("127.0.0.1") || apiUrl.includes("localhost");
+  const hasApiKey = Boolean(apiKey);
+  const canCallApi = hasApiKey && !isLocalApi;
+
   const lines = [
     "Paperclip wake event for a cloud adapter.",
     "",
-    "Run this procedure now. Do not guess undocumented endpoints and do not ask for additional heartbeat docs.",
+    "Run this procedure now.",
     "",
-    "Set these values in your run context:",
+    "Context:",
     ...envLines,
-    "",
-    `api_base=${apiBaseHint}`,
     `task_id=${payload.taskId ?? ""}`,
     `issue_id=${payload.issueId ?? ""}`,
     `wake_reason=${payload.wakeReason ?? ""}`,
@@ -383,33 +387,66 @@ function buildWakeText(payload: WakePayload, paperclipEnv: Record<string, string
     `approval_status=${payload.approvalStatus ?? ""}`,
     `linked_issue_ids=${payload.issueIds.join(",")}`,
     "",
-    "HTTP rules:",
-    "- Use Authorization: Bearer $PAPERCLIP_API_KEY on every API call.",
-    "- Use X-Paperclip-Run-Id: $PAPERCLIP_RUN_ID on every mutating API call.",
-    "- Use only /api endpoints listed below.",
-    "- Do NOT call guessed endpoints like /api/cloud-adapter/*, /api/cloud-adapters/*, /api/adapters/cloud/*, or /api/heartbeat.",
-    "",
-    "Workflow:",
-    "1) GET /api/agents/me",
-    `2) Determine issueId: PAPERCLIP_TASK_ID if present, otherwise issue_id (${issueIdHint}).`,
-    "3) If issueId exists:",
-    "   - POST /api/issues/{issueId}/checkout with {\"agentId\":\"$PAPERCLIP_AGENT_ID\",\"expectedStatuses\":[\"todo\",\"backlog\",\"blocked\"]}",
-    "   - GET /api/issues/{issueId}",
-    "   - GET /api/issues/{issueId}/comments",
-    "   - Execute the issue instructions exactly.",
-    "   - If instructions require a comment, POST /api/issues/{issueId}/comments with {\"body\":\"...\"}.",
-    "   - PATCH /api/issues/{issueId} with {\"status\":\"done\",\"comment\":\"what changed and why\"}.",
-    "4) If issueId does not exist:",
-    "   - GET /api/companies/$PAPERCLIP_COMPANY_ID/issues?assigneeAgentId=$PAPERCLIP_AGENT_ID&status=todo,in_progress,blocked",
-    "   - Pick in_progress first, then todo, then blocked, then execute step 3.",
-    "",
-    "Useful endpoints for issue work:",
-    "- POST /api/issues/{issueId}/comments",
-    "- PATCH /api/issues/{issueId}",
-    "- POST /api/companies/{companyId}/issues (when asked to create a new issue)",
-    "",
-    "Complete the workflow in this run.",
   ];
+
+  if (canCallApi) {
+    // Agent can reach the Paperclip API — full workflow with API calls
+    lines.push(
+      `api_base=${apiBaseHint}`,
+      "",
+      "HTTP rules:",
+      "- Use Authorization: Bearer $PAPERCLIP_API_KEY on every API call.",
+      "- Use X-Paperclip-Run-Id: $PAPERCLIP_RUN_ID on every mutating API call.",
+      "- Use only /api endpoints listed below.",
+      "- Do NOT call guessed endpoints.",
+      "",
+      "Workflow:",
+      "1) GET /api/agents/me",
+      `2) Determine issueId: PAPERCLIP_TASK_ID if present, otherwise issue_id (${issueIdHint}).`,
+      "3) If issueId exists:",
+      "   - POST /api/issues/{issueId}/checkout",
+      "   - GET /api/issues/{issueId}",
+      "   - GET /api/issues/{issueId}/comments",
+      "   - Execute the issue instructions exactly.",
+      "   - POST /api/issues/{issueId}/comments with your results.",
+      "   - PATCH /api/issues/{issueId} with {\"status\":\"done\"}.",
+      "4) If issueId does not exist:",
+      "   - GET /api/companies/$PAPERCLIP_COMPANY_ID/issues?assigneeAgentId=$PAPERCLIP_AGENT_ID&status=todo,in_progress,blocked",
+      "   - Pick in_progress first, then todo, then blocked, then execute step 3.",
+      "",
+      "Complete the workflow in this run.",
+    );
+  } else {
+    // Agent CANNOT reach the Paperclip API (local server, remote agent)
+    // Fire-and-forget mode: work based on context, report via stdout
+    lines.push(
+      "MODE: fire-and-forget (Paperclip API is not reachable from your environment).",
+      "",
+      "Do NOT attempt to call any Paperclip API endpoints (they are on a local network you cannot reach).",
+      "Do NOT try curl to 127.0.0.1 or localhost.",
+      "Do NOT ask for API access or credentials files.",
+      "",
+      "Instead, work autonomously:",
+      `1) Your task ID is: ${issueIdHint || "not specified"}`,
+      `2) Wake reason: ${payload.wakeReason ?? "heartbeat_timer"}`,
+      "3) Use your skills and tools (git, kubectl, gh CLI, etc.) to do the work.",
+      "4) Report your results by printing a structured summary to stdout.",
+      "   Paperclip captures your output via the gateway stream.",
+      "",
+      "Output format (print this at the end of your work):",
+      "```",
+      "PAPERCLIP_RESULT:",
+      "  status: done|blocked|needs_review",
+      `  issue_id: ${issueIdHint}`,
+      `  run_id: ${payload.runId}`,
+      "  summary: <what you did>",
+      "  details: <detailed description>",
+      "```",
+      "",
+      "Do your best work with the tools available to you. Focus on the task.",
+    );
+  }
+
   return lines.join("\n");
 }
 
