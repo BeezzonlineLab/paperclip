@@ -357,6 +357,12 @@ function buildWakeText(payload: WakePayload, paperclipEnv: Record<string, string
     envLines.push(`${key}=${value}`);
   }
 
+  // Inject PAPERCLIP_API_KEY directly instead of referencing a file path
+  const apiKey = paperclipEnv.PAPERCLIP_API_KEY ?? "";
+  if (apiKey) {
+    envLines.push(`PAPERCLIP_API_KEY=${apiKey}`);
+  }
+
   const issueIdHint = payload.taskId ?? payload.issueId ?? "";
   const apiBaseHint = paperclipEnv.PAPERCLIP_API_URL ?? "<set PAPERCLIP_API_URL>";
 
@@ -367,9 +373,6 @@ function buildWakeText(payload: WakePayload, paperclipEnv: Record<string, string
     "",
     "Set these values in your run context:",
     ...envLines,
-    `PAPERCLIP_API_KEY=<token from ${claimedApiKeyPath}>`,
-    "",
-    `Load PAPERCLIP_API_KEY from ${claimedApiKeyPath} (the token you saved after claim-api-key).`,
     "",
     `api_base=${apiBaseHint}`,
     `task_id=${payload.taskId ?? ""}`,
@@ -1053,7 +1056,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
 
   const wakePayload = buildWakePayload(ctx);
   const paperclipEnv = buildPaperclipEnvForWake(ctx, wakePayload);
-  const wakeText = buildWakeText(wakePayload, paperclipEnv);
+  const skipWakeInstructions = parseBoolean(ctx.config.skipWakeInstructions, false);
+  console.log(`[openclaw-gateway] skipWakeInstructions=${skipWakeInstructions} config=${JSON.stringify(ctx.config.skipWakeInstructions)}`);
+  const wakeText = skipWakeInstructions ? "" : buildWakeText(wakePayload, paperclipEnv);
 
   const sessionKeyStrategy = normalizeSessionKeyStrategy(ctx.config.sessionKeyStrategy);
   const configuredSessionKey = nonEmpty(ctx.config.sessionKey);
@@ -1065,7 +1070,10 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   });
 
   const templateMessage = nonEmpty(payloadTemplate.message) ?? nonEmpty(payloadTemplate.text);
-  const message = templateMessage ? appendWakeText(templateMessage, wakeText) : wakeText;
+  const message = skipWakeInstructions
+    ? (templateMessage ?? wakePayload.wakeReason ?? `Task from Paperclip: ${wakePayload.taskId ?? "check assigned issues"}`)
+    : (templateMessage ? appendWakeText(templateMessage, wakeText) : wakeText);
+  console.log(`[openclaw-gateway] message=${message.substring(0, 120)}...`);
   const paperclipPayload = buildStandardPaperclipPayload(ctx, wakePayload, paperclipEnv, payloadTemplate);
 
   const agentParams: Record<string, unknown> = {
