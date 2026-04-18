@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, type InfiniteData, type QueryClient } from "@
 import type { Agent, Issue, IssueComment, LiveEvent } from "@paperclipai/shared";
 import type { RunForIssue } from "../api/activity";
 import type { ActiveRunForIssue, LiveRunForIssue } from "../api/heartbeats";
+import type { CompanyUserDirectoryResponse } from "../api/access";
 import { issuesApi } from "../api/issues";
 import { authApi } from "../api/auth";
 import { useCompany } from "./CompanyContext";
@@ -52,6 +53,19 @@ function resolveAgentName(
   return agent?.name ?? null;
 }
 
+function resolveUserName(
+  queryClient: QueryClient,
+  companyId: string,
+  userId: string,
+): string | null {
+  const directory = queryClient.getQueryData<CompanyUserDirectoryResponse>(
+    queryKeys.access.companyUserDirectory(companyId),
+  );
+  if (!directory) return null;
+  const entry = directory.users.find((u) => u.principalId === userId);
+  return entry?.user?.name?.trim() || entry?.user?.email?.trim() || null;
+}
+
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
   return text.slice(0, max - 1) + "\u2026";
@@ -68,7 +82,7 @@ function resolveActorLabel(
   }
   if (actorType === "system") return "System";
   if (actorType === "user" && actorId) {
-    return "Board";
+    return resolveUserName(queryClient, companyId, actorId) ?? "Board";
   }
   return "Someone";
 }
@@ -243,6 +257,30 @@ function shouldSuppressRunStatusToastForVisibleIssue(
 
   const agentId = readString(payload.agentId);
   return !!agentId && !!context.assigneeAgentId && agentId === context.assigneeAgentId;
+}
+
+function invalidateVisibleIssueRunQueries(
+  queryClient: QueryClient,
+  pathname: string,
+  payload: Record<string, unknown>,
+  options?: VisibleRouteOptions,
+): boolean {
+  const context = resolveVisibleIssueRouteContext(queryClient, pathname, options);
+  if (!context) return false;
+
+  const runId = readString(payload.runId);
+  const agentId = readString(payload.agentId);
+  const matchesVisibleIssue =
+    (runId !== null && context.runIds.has(runId)) ||
+    (!!agentId && !!context.assigneeAgentId && agentId === context.assigneeAgentId);
+  if (!matchesVisibleIssue) return false;
+
+  queryClient.invalidateQueries({ queryKey: queryKeys.issues.detail(context.routeIssueRef) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.issues.activity(context.routeIssueRef) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.issues.runs(context.routeIssueRef) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.issues.liveRuns(context.routeIssueRef) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.issues.activeRun(context.routeIssueRef) });
+  return true;
 }
 
 function shouldSuppressAgentStatusToastForVisibleIssue(
@@ -735,6 +773,7 @@ function handleLiveEvent(
 
   if (event.type === "heartbeat.run.queued" || event.type === "heartbeat.run.status") {
     invalidateHeartbeatQueries(queryClient, expectedCompanyId, payload);
+    invalidateVisibleIssueRunQueries(queryClient, pathname, payload);
     if (event.type === "heartbeat.run.status") {
       const toast = buildRunStatusToast(payload, nameOf);
       if (
@@ -830,6 +869,7 @@ export const __liveUpdatesTestUtils = {
   closeSocketQuietly,
   hydrateVisibleIssueComment,
   invalidateActivityQueries,
+  invalidateVisibleIssueRunQueries,
   resolveLiveCompanyId,
   shouldDeferIssueRefetchForVisibleAgentActivity,
   shouldDeferVisibleIssueCommentActivity,
