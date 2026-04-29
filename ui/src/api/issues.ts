@@ -1,6 +1,7 @@
 import type {
   AskUserQuestionsAnswer,
   Approval,
+  CreateIssueTreeHold,
   DocumentRevision,
   FeedbackTargetType,
   FeedbackTrace,
@@ -11,7 +12,11 @@ import type {
   IssueDocument,
   IssueLabel,
   IssueThreadInteraction,
+  IssueTreeControlPreview,
+  IssueTreeHold,
   IssueWorkProduct,
+  PreviewIssueTreeControl,
+  ReleaseIssueTreeHold,
   UpsertIssueDocument,
 } from "@paperclipai/shared";
 import { api } from "./client";
@@ -38,9 +43,12 @@ export const issuesApi = {
       executionWorkspaceId?: string;
       originKind?: string;
       originId?: string;
+      descendantOf?: string;
       includeRoutineExecutions?: boolean;
+      includeBlockedBy?: boolean;
       q?: string;
       limit?: number;
+      offset?: number;
     },
   ) => {
     const params = new URLSearchParams();
@@ -58,9 +66,12 @@ export const issuesApi = {
     if (filters?.executionWorkspaceId) params.set("executionWorkspaceId", filters.executionWorkspaceId);
     if (filters?.originKind) params.set("originKind", filters.originKind);
     if (filters?.originId) params.set("originId", filters.originId);
+    if (filters?.descendantOf) params.set("descendantOf", filters.descendantOf);
     if (filters?.includeRoutineExecutions) params.set("includeRoutineExecutions", "true");
+    if (filters?.includeBlockedBy) params.set("includeBlockedBy", "true");
     if (filters?.q) params.set("q", filters.q);
     if (filters?.limit) params.set("limit", String(filters.limit));
+    if (filters?.offset !== undefined) params.set("offset", String(filters.offset));
     const qs = params.toString();
     return api.get<Issue[]>(`/companies/${companyId}/issues${qs ? `?${qs}` : ""}`);
   },
@@ -79,6 +90,41 @@ export const issuesApi = {
     api.post<Issue>(`/companies/${companyId}/issues`, data),
   update: (id: string, data: Record<string, unknown>) =>
     api.patch<IssueUpdateResponse>(`/issues/${id}`, data),
+  previewTreeControl: (id: string, data: PreviewIssueTreeControl) =>
+    api.post<IssueTreeControlPreview>(`/issues/${id}/tree-control/preview`, data),
+  createTreeHold: (id: string, data: CreateIssueTreeHold) =>
+    api.post<{ hold: IssueTreeHold; preview: IssueTreeControlPreview }>(`/issues/${id}/tree-holds`, data),
+  getTreeHold: (id: string, holdId: string) =>
+    api.get<IssueTreeHold>(`/issues/${id}/tree-holds/${holdId}`),
+  listTreeHolds: (
+    id: string,
+    filters?: {
+      status?: "active" | "released";
+      mode?: "pause" | "resume" | "cancel" | "restore";
+      includeMembers?: boolean;
+    },
+  ) => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.set("status", filters.status);
+    if (filters?.mode) params.set("mode", filters.mode);
+    if (filters?.includeMembers) params.set("includeMembers", "true");
+    const qs = params.toString();
+    return api.get<IssueTreeHold[]>(`/issues/${id}/tree-holds${qs ? `?${qs}` : ""}`);
+  },
+  getTreeControlState: (id: string) =>
+    api.get<{
+      activePauseHold: {
+        holdId: string;
+        rootIssueId: string;
+        issueId: string;
+        isRoot: boolean;
+        mode: "pause";
+        reason: string | null;
+        releasePolicy: { strategy: "manual" | "after_active_runs_finish"; note?: string | null } | null;
+      } | null;
+    }>(`/issues/${id}/tree-control/state`),
+  releaseTreeHold: (id: string, holdId: string, data: ReleaseIssueTreeHold) =>
+    api.post<IssueTreeHold>(`/issues/${id}/tree-holds/${holdId}/release`, data),
   remove: (id: string) => api.delete<Issue>(`/issues/${id}`),
   checkout: (id: string, agentId: string) =>
     api.post<Issue>(`/issues/${id}/checkout`, {
