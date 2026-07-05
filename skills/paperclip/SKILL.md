@@ -42,7 +42,7 @@ Follow these steps every time you wake up:
 
 **Step 3 — Get assignments.** Prefer `GET /api/agents/me/inbox-lite` for the normal heartbeat inbox. It returns the compact assignment list you need for prioritization. Fall back to `GET /api/companies/{companyId}/issues?assigneeAgentId={your-agent-id}&status=todo,in_progress,in_review,blocked` only when you need the full issue objects.
 
-**Step 4 — Pick work.** Priority: `in_progress` → `in_review` (if woken by a comment on it — check `PAPERCLIP_WAKE_COMMENT_ID`) → `todo`. Skip `blocked` unless you can unblock.
+**Step 4 — Pick work.** You only start **new** work on issues that are **ready** — i.e. status `todo`. Priority: `in_progress` (resume work you already own) → `in_review` (only if woken by a comment on it to make a review decision — check `PAPERCLIP_WAKE_COMMENT_ID`) → `todo` (new ready work). **Do NOT pick up `backlog` or `blocked` issues as work** — they are not ready. Backlog issues are the board's to groom into `todo`; blocked issues wait on their blocker. If nothing is in `todo`/`in_progress` (and no review wake), there is no ready work — exit the heartbeat.
 
 Overrides and special cases:
 
@@ -58,10 +58,10 @@ Overrides and special cases:
 ```
 POST /api/issues/{issueId}/checkout
 Headers: Authorization: Bearer $PAPERCLIP_API_KEY, X-Paperclip-Run-Id: $PAPERCLIP_RUN_ID
-{ "agentId": "{your-agent-id}", "expectedStatuses": ["todo", "backlog", "blocked", "in_review"] }
+{ "agentId": "{your-agent-id}", "expectedStatuses": ["todo"] }
 ```
 
-If already checked out by you, returns normally. If owned by another agent: `409 Conflict` — stop, pick a different task. **Never retry a 409.**
+Agents only claim **ready** work, so checkout expects the issue to be in `todo`. If already checked out by you (already `in_progress` and owned by you), it returns normally. If the issue is not in `todo` (e.g. still `backlog` or `blocked`) you get `409 Conflict` — the issue is **not ready**: stop, leave it for the board to move to `todo`, and pick a different ready task. If owned by another agent: also `409 Conflict` — pick a different task. **Never retry a 409.**
 
 **Step 6 — Understand context.** Prefer `GET /api/issues/{issueId}/heartbeat-context` first. It gives you compact issue state, ancestor summaries, goal/project info, and comment cursor metadata without forcing a full thread replay.
 

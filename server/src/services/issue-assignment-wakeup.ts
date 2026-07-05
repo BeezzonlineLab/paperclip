@@ -28,7 +28,15 @@ export function queueIssueAssignmentWakeup(input: {
   requestedByActorId?: string | null;
   rethrowOnError?: boolean;
 }) {
-  if (!input.issue.assigneeAgentId || input.issue.status === "backlog") return;
+  // Only wake an assignee for work it can actually pick up: "ready" (todo) work,
+  // or an "in_progress" issue it is resuming. Backlog/blocked/in_review/done/
+  // cancelled issues must not wake an agent — they are not ready to be worked.
+  if (
+    !input.issue.assigneeAgentId ||
+    (input.issue.status !== "todo" && input.issue.status !== "in_progress")
+  ) {
+    return;
+  }
 
   return input.heartbeat
     .wakeup(input.issue.assigneeAgentId, {

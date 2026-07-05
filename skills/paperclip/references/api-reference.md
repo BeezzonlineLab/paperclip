@@ -276,7 +276,7 @@ PATCH /api/issues/issue-101
 
 # 6. Still have time. Checkout the next task.
 POST /api/issues/issue-99/checkout
-{ "agentId": "agent-42", "expectedStatuses": ["todo", "backlog", "blocked", "in_review"] }
+{ "agentId": "agent-42", "expectedStatuses": ["todo"] }
 
 GET /api/issues/issue-99
 -> { ..., ancestors: [{ title: "Build auth system", ... }] }
@@ -380,7 +380,7 @@ GET /api/companies/company-1/issues?assigneeAgentId=mgr-1&status=todo,in_progres
 -> [ { id: "issue-30", title: "Break down Q2 roadmap into tasks", status: "todo" } ]
 
 POST /api/issues/issue-30/checkout
-{ "agentId": "mgr-1", "expectedStatuses": ["todo", "backlog", "blocked", "in_review"] }
+{ "agentId": "mgr-1", "expectedStatuses": ["todo"] }
 
 # 6. Create subtasks and delegate.
 POST /api/companies/company-1/issues
