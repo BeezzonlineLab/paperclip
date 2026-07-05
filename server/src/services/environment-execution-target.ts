@@ -46,6 +46,7 @@ export async function resolveEnvironmentExecutionTarget(input: {
     }
 
     const parsed = await resolveEnvironmentDriverConfigForRuntime(input.db, input.companyId, {
+      id: input.environment.id,
       driver: input.environment.driver as "sandbox",
       config: parseObject(input.environment.config),
     });
@@ -58,23 +59,27 @@ export async function resolveEnvironmentExecutionTarget(input: {
         ? input.leaseMetadata.remoteCwd.trim()
         : DEFAULT_SANDBOX_REMOTE_CWD;
     const timeoutMs = "timeoutMs" in parsed.config ? parsed.config.timeoutMs : null;
-    const paperclipApiUrl =
-      typeof input.leaseMetadata?.paperclipApiUrl === "string" && input.leaseMetadata.paperclipApiUrl.trim().length > 0
-        ? input.leaseMetadata.paperclipApiUrl.trim()
+    const shellCommand =
+      input.leaseMetadata?.shellCommand === "bash" || input.leaseMetadata?.shellCommand === "sh"
+        ? input.leaseMetadata.shellCommand
         : null;
 
     return {
       kind: "remote",
       transport: "sandbox",
       providerKey: parsed.config.provider,
+      shellCommand,
       remoteCwd,
       environmentId: input.environment.id ?? null,
       leaseId: input.leaseId ?? null,
-      paperclipApiUrl,
-      paperclipTransport: paperclipApiUrl ? "direct" : "bridge",
       timeoutMs,
+      // Run-log streaming defaults ON for sandbox environments so agent CLI
+      // output reaches the UI mid-run; `streamRunLogs: false` is an explicit
+      // opt-out back to batch-at-end delivery.
+      streamRunLogs: parsed.config.streamRunLogs !== false,
       runner: input.environmentRuntime && input.lease
         ? {
+            supportsSingleStreamStdinProgress: false,
             execute: async (commandInput) => {
               const startedAt = new Date().toISOString();
               const result = await input.environmentRuntime!.execute({
@@ -120,6 +125,7 @@ export async function resolveEnvironmentExecutionTarget(input: {
   }
 
   const parsed = await resolveEnvironmentDriverConfigForRuntime(input.db, input.companyId, {
+    id: input.environment.id,
     driver: input.environment.driver as "ssh",
     config: parseObject(input.environment.config),
   });
@@ -138,10 +144,6 @@ export async function resolveEnvironmentExecutionTarget(input: {
     environmentId: input.environment.id ?? null,
     leaseId: input.leaseId ?? null,
     remoteCwd,
-    paperclipApiUrl:
-      typeof input.leaseMetadata?.paperclipApiUrl === "string" && input.leaseMetadata.paperclipApiUrl.trim().length > 0
-        ? input.leaseMetadata.paperclipApiUrl.trim()
-        : null,
     spec: {
       host: parsed.config.host,
       port: parsed.config.port,
@@ -151,10 +153,6 @@ export async function resolveEnvironmentExecutionTarget(input: {
       knownHosts: parsed.config.knownHosts,
       strictHostKeyChecking: parsed.config.strictHostKeyChecking,
       remoteCwd,
-      paperclipApiUrl:
-        typeof input.leaseMetadata?.paperclipApiUrl === "string" && input.leaseMetadata.paperclipApiUrl.trim().length > 0
-          ? input.leaseMetadata.paperclipApiUrl.trim()
-          : null,
     },
   };
 }
