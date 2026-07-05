@@ -20,6 +20,10 @@ export type IssueFilterState = {
   workspaces: string[];
   liveOnly?: boolean;
   hideRoutineExecutions: boolean;
+  // When false (the default), finished issues (done/cancelled) are hidden from the
+  // default list view unless an explicit status filter is set. The board view is
+  // never affected. See applyDefaultFinishedVisibility().
+  showFinished?: boolean;
 };
 
 export const defaultIssueFilterState: IssueFilterState = {
@@ -32,16 +36,34 @@ export const defaultIssueFilterState: IssueFilterState = {
   workspaces: [],
   liveOnly: false,
   hideRoutineExecutions: false,
+  showFinished: false,
 };
+
+export const FINISHED_ISSUE_STATUSES = ["done", "cancelled"] as const;
+
+/**
+ * List-view default: hide finished issues (done/cancelled) unless the operator
+ * opted into showing them, or set an explicit status filter (which then governs
+ * visibility on its own). Not applied to the board view — the caller gates on
+ * view mode. Returns the issues unchanged when finished issues should remain.
+ */
+export function applyDefaultFinishedVisibility(
+  issues: Issue[],
+  state: Pick<IssueFilterState, "statuses" | "showFinished">,
+): Issue[] {
+  if (state.showFinished === true) return issues;
+  if (state.statuses.length > 0) return issues;
+  return issues.filter((issue) => !FINISHED_ISSUE_STATUSES.includes(issue.status as never));
+}
 
 export const issueStatusOrder = ["in_progress", "todo", "backlog", "in_review", "blocked", "done", "cancelled"];
 export const issuePriorityOrder = ["critical", "high", "medium", "low"];
 
 export const issueQuickFilterPresets = [
-  { label: "All", statuses: [] as string[] },
-  { label: "Active", statuses: ["todo", "in_progress", "in_review", "blocked"] },
-  { label: "Backlog", statuses: ["backlog"] },
-  { label: "Done", statuses: ["done", "cancelled"] },
+  { label: "All", statuses: [] as string[], showFinished: true },
+  { label: "Active", statuses: ["todo", "in_progress", "in_review", "blocked"], showFinished: false },
+  { label: "Backlog", statuses: ["backlog"], showFinished: false },
+  { label: "Done", statuses: ["done", "cancelled"], showFinished: true },
 ];
 
 export function issueFilterLabel(value: string): string {
@@ -73,6 +95,7 @@ export function normalizeIssueFilterState(value: unknown): IssueFilterState {
     workspaces: normalizeIssueFilterValueArray(candidate.workspaces),
     liveOnly: candidate.liveOnly === true,
     hideRoutineExecutions: candidate.hideRoutineExecutions === true,
+    showFinished: candidate.showFinished === true,
   };
 }
 

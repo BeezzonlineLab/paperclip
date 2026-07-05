@@ -23,6 +23,7 @@ import {
 } from "../lib/issue-detail-subissues";
 import { groupBy } from "../lib/groupBy";
 import {
+  applyDefaultFinishedVisibility,
   applyIssueFilters,
   countActiveIssueFilters,
   defaultIssueFilterState,
@@ -364,6 +365,11 @@ interface IssuesListProps {
   defaultSortField?: IssueSortField;
   showProgressSummary?: boolean;
   enableRoutineVisibilityFilter?: boolean;
+  // When enabled, the list view hides finished issues (done/cancelled) by default
+  // unless the operator opts in via "Show finished" or an explicit status filter.
+  // Off for embedded lists (e.g. sub-issue/workflow checklists) so completed steps
+  // stay visible. The board view is never affected.
+  hideFinishedByDefault?: boolean;
   hasMoreIssues?: boolean;
   isLoadingMoreIssues?: boolean;
   mutedIssueIds?: Set<string>;
@@ -536,6 +542,7 @@ export function IssuesList({
   defaultSortField,
   showProgressSummary = false,
   enableRoutineVisibilityFilter = false,
+  hideFinishedByDefault = false,
   hasMoreIssues = false,
   isLoadingMoreIssues = false,
   mutedIssueIds,
@@ -892,7 +899,13 @@ export function IssuesList({
       liveIssueIds,
       issueFilterWorkspaceContext,
     );
-    return sortIssues(filteredByControls, viewState);
+    // On the main issues page the list view hides finished issues (done/cancelled)
+    // by default; the board keeps all status columns and embedded lists are opt-out.
+    // An explicit status filter or "Show finished" opts back in.
+    const visibleIssues = hideFinishedByDefault && viewState.viewMode === "list"
+      ? applyDefaultFinishedVisibility(filteredByControls, viewState)
+      : filteredByControls;
+    return sortIssues(visibleIssues, viewState);
   }, [
     boardIssues,
     issues,
@@ -902,6 +915,7 @@ export function IssuesList({
     normalizedIssueSearch,
     currentUserId,
     enableRoutineVisibilityFilter,
+    hideFinishedByDefault,
     liveIssueIds,
     issueFilterWorkspaceContext,
   ]);

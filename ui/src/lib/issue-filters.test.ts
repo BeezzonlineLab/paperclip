@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import type { Issue } from "@paperclipai/shared";
 import {
+  applyDefaultFinishedVisibility,
   applyIssueFilters,
   countActiveIssueFilters,
   defaultIssueFilterState,
@@ -49,6 +50,36 @@ function makeIssue(overrides: Partial<Issue> = {}): Issue {
     ...overrides,
   };
 }
+
+describe("applyDefaultFinishedVisibility", () => {
+  const issues = [
+    makeIssue({ id: "todo", status: "todo" }),
+    makeIssue({ id: "in-progress", status: "in_progress" }),
+    makeIssue({ id: "done", status: "done" }),
+    makeIssue({ id: "cancelled", status: "cancelled" }),
+  ];
+
+  it("hides done and cancelled by default (no status filter, showFinished off)", () => {
+    const result = applyDefaultFinishedVisibility(issues, { statuses: [], showFinished: false });
+    expect(result.map((i) => i.id)).toEqual(["todo", "in-progress"]);
+  });
+
+  it("keeps finished issues when showFinished is true", () => {
+    const result = applyDefaultFinishedVisibility(issues, { statuses: [], showFinished: true });
+    expect(result.map((i) => i.id)).toEqual(["todo", "in-progress", "done", "cancelled"]);
+  });
+
+  it("leaves visibility to the explicit status filter when one is set", () => {
+    // e.g. the user ticked "done" — governance passes to applyIssueFilters, not this helper.
+    const result = applyDefaultFinishedVisibility(issues, { statuses: ["done"], showFinished: false });
+    expect(result.map((i) => i.id)).toEqual(["todo", "in-progress", "done", "cancelled"]);
+  });
+
+  it("defaults to hiding when showFinished is undefined", () => {
+    const result = applyDefaultFinishedVisibility(issues, { statuses: [] });
+    expect(result.map((i) => i.id)).toEqual(["todo", "in-progress"]);
+  });
+});
 
 describe("issue filters", () => {
   it("filters issues by creator across agents and users", () => {

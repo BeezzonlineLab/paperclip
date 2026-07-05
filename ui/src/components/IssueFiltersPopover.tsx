@@ -146,7 +146,9 @@ export function IssueFiltersPopover({
             <span className="text-xs text-muted-foreground">Quick filters</span>
             <div className="flex flex-wrap gap-1.5">
               {issueQuickFilterPresets.map((preset) => {
-                const isActive = issueFilterArraysEqual(state.statuses, preset.statuses);
+                const isActive =
+                  issueFilterArraysEqual(state.statuses, preset.statuses)
+                  && (state.showFinished === true) === (preset.showFinished === true);
                 return (
                   <button
                     key={preset.label}
@@ -156,7 +158,13 @@ export function IssueFiltersPopover({
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
                     }`}
-                    onClick={() => onChange({ statuses: isActive ? [] : [...preset.statuses] })}
+                    onClick={() =>
+                      onChange(
+                        isActive
+                          ? { statuses: [], showFinished: false }
+                          : { statuses: [...preset.statuses], showFinished: preset.showFinished === true },
+                      )
+                    }
                   >
                     {preset.label}
                   </button>
@@ -346,6 +354,13 @@ export function IssueFiltersPopover({
 
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground">Visibility</span>
+                <label className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 hover:bg-accent/50">
+                  <Checkbox
+                    checked={state.showFinished === true}
+                    onCheckedChange={(checked) => onChange({ showFinished: checked === true })}
+                  />
+                  <span className="text-sm">Show finished (done &amp; cancelled)</span>
+                </label>
                 <label className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 hover:bg-accent/50">
                   <Checkbox
                     checked={state.liveOnly}

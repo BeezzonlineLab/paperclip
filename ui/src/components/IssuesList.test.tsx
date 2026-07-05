@@ -1306,6 +1306,62 @@ describe("IssuesList", () => {
     });
   });
 
+  it("hides finished issues by default in the list view when hideFinishedByDefault is set", async () => {
+    const todoIssue = createIssue({ id: "issue-todo", title: "Alpha", status: "todo" });
+    const doneIssue = createIssue({ id: "issue-done", title: "Beta", status: "done" });
+
+    const { root } = renderWithQueryClient(
+      <IssuesList
+        issues={[todoIssue, doneIssue]}
+        agents={[]}
+        projects={[]}
+        viewStateKey="paperclip:test-issues"
+        hideFinishedByDefault
+        onUpdateIssue={() => undefined}
+      />,
+      container,
+    );
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain("Alpha");
+      expect(container.textContent).not.toContain("Beta");
+    });
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  it("shows finished issues when showFinished is stored even with hideFinishedByDefault", async () => {
+    localStorage.setItem(
+      "paperclip:test-issues:company-1",
+      JSON.stringify({ showFinished: true }),
+    );
+    const todoIssue = createIssue({ id: "issue-todo", title: "Alpha", status: "todo" });
+    const doneIssue = createIssue({ id: "issue-done", title: "Beta", status: "done" });
+
+    const { root } = renderWithQueryClient(
+      <IssuesList
+        issues={[todoIssue, doneIssue]}
+        agents={[]}
+        projects={[]}
+        viewStateKey="paperclip:test-issues"
+        hideFinishedByDefault
+        onUpdateIssue={() => undefined}
+      />,
+      container,
+    );
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain("Alpha");
+      expect(container.textContent).toContain("Beta");
+    });
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
   it("filters the list to a single workspace when a workspace name is clicked", async () => {
     localStorage.setItem("paperclip:test-issues:company-1:issue-columns", JSON.stringify(["id", "workspace"]));
     mockInstanceSettingsApi.getExperimental.mockResolvedValue({ enableIsolatedWorkspaces: true });
