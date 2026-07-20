@@ -97,6 +97,7 @@ If `currentParticipant` does not match you, do not try to advance the stage — 
 - If your heartbeat creates a pending board/user interaction or approval before more work can proceed, leave the source issue in an explicit waiting posture before you exit. Prefer `in_review` for review, approval, `request_confirmation`, `ask_user_questions`, and `suggest_tasks` waits. Use `blocked` with `blockedByIssueIds` when another issue is the blocker.
 - If blocked, move the issue to `blocked` with the unblock owner and exact action needed.
 - Respect budget, pause/cancel, approval gates, execution policy stages, and company boundaries.
+- **Git delivery (required):** Ship every code change through a pull request — **never commit, push, or merge directly to `master`/`main`**. Open PRs against **`develop`** as the target/base branch. **Always rebase your work branch onto the latest target before opening or updating a PR**: `git fetch origin && git rebase origin/develop`, then resolve conflicts locally. Do not fast-forward or merge branches straight into `master`/`develop`.
 
 ### Generated Artifacts and Work Products
 
