@@ -11500,12 +11500,6 @@ describeEmbeddedPostgres("chat channel control-plane integration", () => {
       enabled: false,
       healthStatus: "degraded",
     });
-    await recordGitHubWebhookVerification(
-      service,
-      endpoint.publicId,
-      webhookSecret,
-    );
-
     const reconnected = await service.configure(
       endpoint.id,
       { action: "reconnect" },
@@ -11516,6 +11510,7 @@ describeEmbeddedPostgres("chat channel control-plane integration", () => {
       status: "verifying",
       setup: { step: "test", webhookSecretConfigured: true },
     });
+    expect((await service.get(endpoint.id)).setup.webhookVerifiedAt).toBeNull();
     expect(
       runtime.configurations.get(endpoint.id)?.providerConfig,
     ).toMatchObject({

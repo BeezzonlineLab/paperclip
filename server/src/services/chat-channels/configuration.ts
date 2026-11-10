@@ -606,7 +606,7 @@ export function createChatConfiguration(db: Db, options: ChatConfigurationOption
     }
     if (
       endpoint.provider === "github" &&
-      (input.action === "configure" || input.action === "reconnect") &&
+      input.action === "configure" &&
       !endpoint.setup.webhookVerifiedAt
     ) {
       throw conflict(
